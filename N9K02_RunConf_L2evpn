@@ -1,0 +1,102 @@
+version 7.0(3)I7(3)
+hostname N9K02
+vdc N9K02 id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource u4route-mem minimum 248 maximum 248
+  limit-resource u6route-mem minimum 96 maximum 96
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+nv overlay evpn
+feature ospf
+feature bgp
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+username admin password 5 $5$yZZbqqWT$AX7LSLviKaA6xGG9lR/zrX89SIOA0lztjbe0VEvlH8
+2  role network-admin
+ip domain-lookup
+snmp-server user admin network-admin auth md5 0x5f3a9b9901817dfbeb6960a8fc100adc
+ priv 0x5f3a9b9901817dfbeb6960a8fc100adc localizedkey
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+
+fabric forwarding anycast-gateway-mac 0000.2222.3333
+vlan 1,100
+vlan 100
+  name vxlan_custA
+  vn-segment 5000
+
+vrf context management
+vrf context vxlan_custA
+  rd 65001:2
+  address-family ipv4 unicast
+    route-target import 65001:1 evpn
+    route-target export 65001:2 evpn
+
+interface Vlan1
+
+interface Vlan100
+  no shutdown
+  vrf member vxlan_custA
+  ip address 192.168.100.1/24
+  fabric forwarding mode anycast-gateway
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback0
+  member vni 5000
+    ingress-replication protocol bgp
+
+interface Ethernet1/1
+  no switchport
+  mtu 1550
+  ip address 10.0.0.6/30
+  ip ospf network point-to-point
+  ip router ospf 1 area 0.0.0.0
+  no shutdown
+
+interface Ethernet1/2
+  switchport access vlan 100
+
+interface Ethernet1/3
+  no switchport
+  mtu 1550
+  ip address 10.0.0.14/30
+  ip ospf network point-to-point
+  ip router ospf 1 area 0.0.0.0
+  no shutdown
+
+interface mgmt0
+  vrf member management
+
+interface loopback0
+  ip address 2.2.2.2/32
+  ip router ospf 1 area 0.0.0.0
+line console
+line vty
+router ospf 1
+  router-id 2.2.2.2
+ip load-sharing address source-destination rotate 32
+router bgp 65001
+  neighbor 1.1.1.1
+    remote-as 65001
+    update-source loopback0
+    address-family ipv4 unicast
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf vxlan_custA
+    address-family ipv4 unicast
+evpn
+  vni 5000 l2
+    rd 65001:2
+    route-target import 65001:1
+    route-target export 65001:2
